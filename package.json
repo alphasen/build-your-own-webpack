@@ -1,0 +1,10 @@
+{
+  "name": "hpack",
+  "version": "1.0.0",
+  "main": "./bin/index.js",
+  "license": "MIT",
+  "scripts": {
+      "hpack":"node ./bin/index.js",
+      "hpack:config":"node ./bin/index.js --config webpack.config.js"
+  }
+}
