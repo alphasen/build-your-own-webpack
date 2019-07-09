@@ -9,4 +9,4 @@ if (options[2] && options[2].indexOf('--config') === 0) {
 }
 
 let hpack = new Hpack(configFilePath);
-hpack.pack();
+hpack.bundle();

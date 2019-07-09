@@ -4,7 +4,12 @@
   "main": "./bin/index.js",
   "license": "MIT",
   "scripts": {
-      "hpack":"node ./bin/index.js",
-      "hpack:config":"node ./bin/index.js --config webpack.config.js"
+    "hpack": "node ./bin/index.js",
+    "hpack:config": "node ./bin/index.js --config webpack.config.js"
+  },
+  "devDependencies": {
+    "babel-traverse": "^6.26.0",
+    "babylon": "^6.18.0",
+    "lodash": "^4.17.11"
   }
 }

@@ -1,74 +1,90 @@
+/**
+ * https://github.com/chinanf-boy/minipack-explain/blob/master/explain.md#use-link
+ */
 const path = require('path');
 const fs = require('fs');
+const babylon=require('babylon')
+const traverse = require('babel-traverse').default;
+const _=require('lodash')
 
 class Hpack {
     constructor(config = '../hpack.config.js') {
         this.config = require(config);
+        this.graph = []; // 依赖关系存储
+        this.moduleId = 0; // moduleId从0开始
     }
 
     /**
-     * 获取最终输出的文件名
+     * 解析每个module,分析其依赖，返回分析结果
+     * @param {string} filename 要解析的js file
+     * @returns {
+     *      id:moduleId,
+     *      filename:moudle的位置
+     *      dependencies:依赖关系
+     *      code:文件内容
+     *  }
      */
-    generateBundleFileName() {
-        const {
-            output: { path: outputPath, filename: bundleName }
-        } = this.config;
-        return path.resolve(outputPath, bundleName);
-    }
-
-    /**
-     * 通过require中的module名获取文件内容
-     * @param {*} module require的文件名
-     */
-    getFileOfModule(module) {
-        let moduleFilePath = path.resolve(
-            path.dirname(this.config.entry),
-            module.endsWith('.js') ? 'module' : `${module}.js`
-        );
-        return fs.readFileSync(moduleFilePath).toString();
-    }
-
-    /**
-     * 从模块文件字符串中获取真正的exports
-     * @param {string} str 模块字符串
-     */
-    getExportStr(str = '') {
-        const regexp = /module.exports=([\s\S]*)/gm;
-        const match = regexp.exec(str);
-        return match[1];
-    }
-
-    pipe(entryFileStr) {
-        const requireReg = /require\(.?(.*?).?\)/gm;
-        let match = requireReg.exec(entryFileStr);
-        while (match != null) {
-            let module = match[1]; // require('./foo') 中的 ./foo 部分
-            let moduleFileStr = this.getFileOfModule(module);
-            entryFileStr = entryFileStr.replace(
-                match[0],
-                this.getExportStr(moduleFileStr)
-            ); // 替换 require('./foo') 为foo (foo指 module.exports={foo})
-            match = requireReg.exec(entryFileStr);
+    compileModule(filename) {
+        const content = fs.readFileSync(filename,'utf-8');
+        const ast = babylon.parse(content,{sourceType:'module'});
+        // console.log('ast :', JSON.stringify(ast));
+        const dependencies=[]
+        traverse(ast,{
+            ImportDeclaration:(node)=>{
+                dependencies.push(node.source.value)
+            },
+            VariableDeclaration:(node)=>{
+                const caleeName=_.get(node,'init.callee.name')
+                if(caleeName==='require'){
+                    let dept=_.get(node,'init.callee.arguments[0].value')
+                    console.log('dept :', dept);
+                }
+            }
+        })
+        return {
+            id:this.moduleId++,filename,dependencies,
         }
-        return entryFileStr
     }
 
     /**
-     * 入口
+     * 从入口文件递归分析文件依赖关系
+     * @param {string} entry 入口文件
+     * 1. 获取入口文件的编译结果（id,依赖，code）
+     * 2. 处理依赖的依赖关系
+     *      1. 处理依赖的依赖关系（每个被依赖的module也是一个文件，跟入口文件一样的存在）
+     *      2. 获取依赖的编译结果
+     * ------------递归处理-----------------
+     * 3. 将编译结果缓存queque
+     *      [{
+     *          id:'',
+     *          filename:'',
+     *          dependencies:['./foo.js'],
+     *          code:function(){},
+     *          mapping:''
+     *      }]
      */
-    pack() {
-        const { entry } = this.config;
 
-        // 读取文件内容
-        let entryFileStr = fs.readFileSync(entry).toString();
+    drawGraph(entry) {
+        this.graph.push(this.compileModule(entry));
+        for (const module of this.graph) {
+            let dirname = path.dirname(module.filename);
+            module.mapping = {};
+            module.dependencies.forEach(deptFile => {
+                // 生成mapping 对照
+                const absolutePath = path.join(dirname, deptFile); // 绝对路径
+                const child = this.compileModule(absolutePath);
+                module.mapping[deptFile] = child.id;
+                this.graph.push(child);
+            });
+        }
+    }
 
-        // TODO 一系列处理
-        entryFileStr=this.pipe(entryFileStr);
-
-        // 将结果输出
-        fs.writeFileSync(this.generateBundleFileName(), entryFileStr, {
-            flag: 'w+'
-        });
+    /**
+     * 生成最终的bundle文件
+     */
+    bundle() {
+        this.drawGraph(this.config.entry);
+        console.log('this.graph :', JSON.stringify(this.graph));
     }
 }
 
