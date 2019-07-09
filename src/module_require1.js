@@ -1,1 +1,1 @@
-module.exports='wangwu'
+export default 'wangwu'

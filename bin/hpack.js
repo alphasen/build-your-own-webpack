@@ -3,9 +3,10 @@
  */
 const path = require('path');
 const fs = require('fs');
-const babylon=require('babylon')
-const traverse = require('babel-traverse').default;
-const _=require('lodash')
+const babylon = require('babylon');
+const traverse = require('@babel/traverse').default; // traverse是es6的包
+const { transformFromAst } = require('@babel/core');
+const _ = require('lodash');
 
 class Hpack {
     constructor(config = '../hpack.config.js') {
@@ -25,25 +26,39 @@ class Hpack {
      *  }
      */
     compileModule(filename) {
-        const content = fs.readFileSync(filename,'utf-8');
-        const ast = babylon.parse(content,{sourceType:'module'});
-        // console.log('ast :', JSON.stringify(ast));
-        const dependencies=[]
-        traverse(ast,{
-            ImportDeclaration:(node)=>{
-                dependencies.push(node.source.value)
-            },
-            VariableDeclaration:(node)=>{
-                const caleeName=_.get(node,'init.callee.name')
-                if(caleeName==='require'){
-                    let dept=_.get(node,'init.callee.arguments[0].value')
-                    console.log('dept :', dept);
-                }
-            }
-        })
-        return {
-            id:this.moduleId++,filename,dependencies,
+        if (filename && !filename.endsWith('.js')) {
+            filename += '.js';
         }
+        const content = fs.readFileSync(filename, 'utf-8');
+        const ast = babylon.parse(content, { sourceType: 'module' });
+        // console.log('ast :', JSON.stringify(ast));
+        const dependencies = [];
+        // 遍历import ... 节点 处理文件依赖
+        traverse(ast, {
+            ImportDeclaration: ({ node }) => {
+                dependencies.push(node.source.value);
+            }
+        });
+        const { code } = transformFromAst(ast, null, {
+            // es6代码转为es5
+            presets: [
+                [
+                    '@babel/preset-env'
+                    // { // 针对目标平台进行优化
+                    //     targets: {
+                    //         chrome: '75'
+                    //     },
+                    //     debug:true
+                    // }
+                ]
+            ]
+        });
+        return {
+            id: this.moduleId++,
+            filename,
+            dependencies,
+            code
+        };
     }
 
     /**
@@ -63,7 +78,6 @@ class Hpack {
      *          mapping:''
      *      }]
      */
-
     drawGraph(entry) {
         this.graph.push(this.compileModule(entry));
         for (const module of this.graph) {
@@ -84,7 +98,45 @@ class Hpack {
      */
     bundle() {
         this.drawGraph(this.config.entry);
-        console.log('this.graph :', JSON.stringify(this.graph));
+        // console.log('this.graph :', JSON.stringify(this.graph));
+        let modules = '';
+        this.graph.forEach(module => {
+            modules += `
+            ${module.id}:[
+                    function (require,module,exports) {
+                        ${module.code}
+                    },
+                    ${JSON.stringify(module.mapping)}
+                ],
+            `;
+        });
+        let res = `
+            (function (modules) {
+                function require(moduleId) {
+                    const [fn,mapping]=modules[moduleId]
+                    function myRequire(filename) {
+                        return require(mapping[filename])
+                    }
+                    const module={exports:{}}
+                    fn(myRequire,module,module.exports)
+                    return module.exports
+                }
+                require(0)
+            })({${modules}})
+        `;
+        // 将结果输出
+        fs.writeFileSync(this.getBundleFileName(), res, {
+            flag: 'w+'
+        });
+        // console.log('res :', res);
+        console.log('success');
+    }
+
+    getBundleFileName() {
+        const {
+            output: { path: outputPath, filename: bundleName }
+        } = this.config;
+        return path.resolve(outputPath, bundleName);
     }
 }
 

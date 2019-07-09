@@ -7,8 +7,10 @@
     "hpack": "node ./bin/index.js",
     "hpack:config": "node ./bin/index.js --config webpack.config.js"
   },
-  "devDependencies": {
-    "babel-traverse": "^6.26.0",
+  "dependencies": {
+    "@babel/core": "^7.5.0",
+    "@babel/preset-env": "^7.5.2",
+    "@babel/traverse": "^7.5.0",
     "babylon": "^6.18.0",
     "lodash": "^4.17.11"
   }
