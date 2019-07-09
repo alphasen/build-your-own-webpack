@@ -6,6 +6,7 @@ const fs = require('fs');
 const babylon = require('babylon');
 const traverse = require('@babel/traverse').default; // traverse是es6的包
 const { transformFromAst } = require('@babel/core');
+const {getModuleRequireDependencies}=require('./util')
 const _ = require('lodash');
 
 class Hpack {
@@ -30,13 +31,15 @@ class Hpack {
             filename += '.js';
         }
         const content = fs.readFileSync(filename, 'utf-8');
-        const ast = babylon.parse(content, { sourceType: 'module' });
         // console.log('ast :', JSON.stringify(ast));
-        const dependencies = [];
-        // 遍历import ... 节点 处理文件依赖
+        const importDependencies = [];
+        let requireDependencies=getModuleRequireDependencies(content)
+        console.log('requireDependencies :', requireDependencies);
+        const ast = babylon.parse(content, { sourceType: 'module' });
+        // es6的import形式比较多，使用语法树遍历会方便很多 遍历import ... 节点 处理文件依赖
         traverse(ast, {
             ImportDeclaration: ({ node }) => {
-                dependencies.push(node.source.value);
+                importDependencies.push(node.source.value);
             }
         });
         const { code } = transformFromAst(ast, null, {
@@ -56,7 +59,7 @@ class Hpack {
         return {
             id: this.moduleId++,
             filename,
-            dependencies,
+            dependencies:[...importDependencies,...requireDependencies],
             code
         };
     }

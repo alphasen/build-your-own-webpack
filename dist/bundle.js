@@ -22,12 +22,13 @@
                 return obj && obj.__esModule ? obj : { default: obj };
             }
 
-            // const lilei=require('./module_require')
-            // console.log('lilei :', lilei);
-            // lilei.eat('fish')
+            var lilei = require('./module_require');
+
+            console.log('lilei :', lilei);
+            lilei.eat('fish');
             console.log('lilei2 :', _module_require['default']);
         },
-        { './module_require1': 1 }
+        { './module_require1': 1, './module_require': 2 }
     ],
 
     1: [
@@ -40,6 +41,21 @@
             exports['default'] = void 0;
             var _default = 'wangwu';
             exports['default'] = _default;
+        },
+        {}
+    ],
+
+    2: [
+        function(require, module, exports) {
+            'use strict';
+
+            module.exports = {
+                name: 'lilei',
+                age: 33,
+                eat: function eat(food) {
+                    console.log(food);
+                }
+            };
         },
         {}
     ]
