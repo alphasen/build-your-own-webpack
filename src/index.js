@@ -9,3 +9,5 @@ inc.addEventListener('click', () => {
     lilei.incId()
     lilei.sayId()
 })
+
+import './index.css'

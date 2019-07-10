@@ -17,6 +17,24 @@ class Hpack {
     }
 
     /**
+     * 获取文件内容
+     */
+    getSource(filename){
+        let content=fs.readFileSync(filename, 'utf-8');
+        const loaders=_.get(this.config,'module.loaders')||[]
+        loaders.forEach(loaderRule=>{
+            if(loaderRule){
+                const {test='',loader}=loaderRule
+                if(test.exec(filename)){
+                    let loaderFn=require(`./loaders/${loader}`)
+                    content=loaderFn(content)
+                }
+            }
+        })
+        return content
+    }
+
+    /**
      * 解析每个module,分析其依赖，返回分析结果
      * @param {string} filename 要解析的js file
      * @returns {
@@ -27,14 +45,14 @@ class Hpack {
      *  }
      */
     compileModule(filename) {
-        if (filename && !filename.endsWith('.js')) {
+        if(!fs.existsSync(filename)&&fs.existsSync(`${filename}.js`)){// 如果文件不存在，尝试加上js后看是否存在
             filename += '.js';
         }
-        const content = fs.readFileSync(filename, 'utf-8');
+        const content = this.getSource(filename);
         // console.log('ast :', JSON.stringify(ast));
         const importDependencies = [];
         let requireDependencies=getModuleRequireDependencies(content)
-        console.log('requireDependencies :', requireDependencies);
+        // console.log('requireDependencies :', requireDependencies);
         const ast = babylon.parse(content, { sourceType: 'module' });
         // es6的import形式比较多，使用语法树遍历会方便很多 遍历import ... 节点 处理文件依赖
         traverse(ast, {
